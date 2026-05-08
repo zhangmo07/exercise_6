@@ -23,32 +23,28 @@ const apiFetch = async (url, options = {}) => {
   const response = await fetch(url, { ...options, headers });
   const data = await response.json();
 
-  if (!response.ok) {
-    throw data;
-  }
+  if (!response.ok) throw data;
 
   return data;
 };
 
 const checkPasswordRepeat = () => {
   const p = passwordField.value;
+  const r = repeatPasswordField.value;
 
-  if (p.length < 5) {
+  if (p.length > 0 && p.length < 5) {
     passwordField.setCustomValidity("Password must be at least 5 characters long");
-  } else if (p == "12345") {
+  } else if (p === "12345") {
     passwordField.setCustomValidity("That's the kind of password an idiot would have on his luggage!");
   } else {
     passwordField.setCustomValidity("");
-
-    if (passwordField.value != repeatPasswordField.value) {
-      repeatPasswordField.setCustomValidity("Password doesn't match");
-    } else {
-      repeatPasswordField.setCustomValidity("");
-    }
   }
 
-  passwordField.reportValidity();
-  repeatPasswordField.reportValidity();
+  if (r.length > 0 && p !== r) {
+    repeatPasswordField.setCustomValidity("Password doesn't match");
+  } else {
+    repeatPasswordField.setCustomValidity("");
+  }
 };
 
 passwordField.addEventListener("input", checkPasswordRepeat);
@@ -77,6 +73,7 @@ const isLoggedIn = () => !!apiKey();
 
 const updateUserText = () => {
   const name = CURRENT_USER ? CURRENT_USER.name : "";
+
   document.querySelectorAll(".username").forEach((el) => {
     if (el.textContent.includes("Welcome back")) {
       el.textContent = `Welcome back, ${name}!`;
@@ -86,9 +83,7 @@ const updateUserText = () => {
   });
 
   const input = document.querySelector("#update_username");
-  if (input && CURRENT_USER) {
-    input.value = CURRENT_USER.name;
-  }
+  if (input && CURRENT_USER) input.value = CURRENT_USER.name;
 
   document.querySelectorAll(".loggedIn").forEach((el) => {
     el.classList.toggle("hide", !isLoggedIn());
@@ -150,10 +145,12 @@ const renderRooms = async () => {
     const a = document.createElement("a");
     a.href = `/room/${room.id}`;
     a.innerHTML = `${room.id}: <strong>${room.name}</strong>`;
+
     a.addEventListener("click", (event) => {
       event.preventDefault();
       navigate(`/room/${room.id}`);
     });
+
     roomList.appendChild(a);
   });
 };
@@ -182,8 +179,10 @@ const loadMessages = async () => {
 
   try {
     const messages = await apiFetch(`/api/messages/room/${CURRENT_ROOM}`);
+
     document.querySelector(".messages").classList.remove("hide");
     document.querySelector(".noMessages").classList.add("hide");
+
     renderMessages(messages);
   } catch {
     document.querySelector(".messages").classList.add("hide");
@@ -203,10 +202,12 @@ const showRoom = async (roomId) => {
 
   try {
     const room = await apiFetch(`/api/rooms/${roomId}`);
+
     document.querySelector(".displayRoomName strong").textContent = room.name;
     document.querySelector(".editRoomName input").value = room.name;
     document.querySelector(".roomDetail > a").textContent = `/room/${room.id}`;
     document.querySelector(".roomDetail > a").href = `/room/${room.id}`;
+
     document.querySelector(".displayRoomName").classList.remove("hide");
     document.querySelector(".editRoomName").classList.add("hide");
   } catch {
@@ -252,11 +253,6 @@ const router = async () => {
   if (path.startsWith("/room/")) {
     const roomId = path.split("/")[2];
     await showRoom(roomId);
-    return;
-  }
-
-  if (path === "/room") {
-    showOnly(ROOM);
     return;
   }
 
@@ -345,8 +341,13 @@ document.querySelector(".goToSplash").addEventListener("click", () => {
   navigate("/");
 });
 
-document.querySelector("#update_username + button").addEventListener("click", async () => {
-  const name = document.querySelector("#update_username").value;
+document.querySelector("#update_username").nextElementSibling.addEventListener("click", async () => {
+  const name = document.querySelector("#update_username").value.trim();
+
+  if (!name) {
+    alert("Username cannot be empty");
+    return;
+  }
 
   await apiFetch("/api/me/name", {
     method: "POST",
@@ -354,20 +355,37 @@ document.querySelector("#update_username + button").addEventListener("click", as
   });
 
   await loadMe();
+  alert("Username updated");
 });
 
-document.querySelector("#update_password + button").addEventListener("click", async () => {
+document.querySelector("#update_password").nextElementSibling.addEventListener("click", async () => {
   const password = document.querySelector("#update_password").value;
+  const repeat = document.querySelector("#repeat_password").value;
 
-  if (!passwordField.checkValidity() || !repeatPasswordField.checkValidity()) return;
+  if (password.length < 5) {
+    alert("Password must be at least 5 characters long");
+    return;
+  }
+
+  if (password === "12345") {
+    alert("Please choose a different password");
+    return;
+  }
+
+  if (password !== repeat) {
+    alert("Password doesn't match");
+    return;
+  }
 
   await apiFetch("/api/me/password", {
     method: "POST",
     body: JSON.stringify({ password }),
   });
 
-  passwordField.value = "";
-  repeatPasswordField.value = "";
+  alert("Password updated");
+
+  document.querySelector("#update_password").value = "";
+  document.querySelector("#repeat_password").value = "";
 });
 
 document.querySelector(".displayRoomName a").addEventListener("click", () => {
@@ -376,7 +394,12 @@ document.querySelector(".displayRoomName a").addEventListener("click", () => {
 });
 
 document.querySelector(".editRoomName button").addEventListener("click", async () => {
-  const name = document.querySelector(".editRoomName input").value;
+  const name = document.querySelector(".editRoomName input").value.trim();
+
+  if (!name) {
+    alert("Room name cannot be empty");
+    return;
+  }
 
   const room = await apiFetch(`/api/rooms/${CURRENT_ROOM}`, {
     method: "POST",
